@@ -20,7 +20,7 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:   getEnv("Port", "8080"),
+		Port:   getEnv("PORT", "8080"),
 		DB_URL: getEnv("DB_URL", ""),
 	}
 
