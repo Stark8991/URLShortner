@@ -2,20 +2,15 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/Stark8991/URLShortner/internal/config"
 	"github.com/Stark8991/URLShortner/internal/database"
+	"github.com/Stark8991/URLShortner/internal/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-type app struct {
-	db      *pgxpool.Pool
-	queries *database.Queries
-}
 
 func main() {
 	cfg := config.Load()
@@ -31,13 +26,11 @@ func main() {
 		log.Fatal("failed to connect to database: ", err)
 	}
 
-	app := &app{
-		db:      db,
-		queries: database.New(db),
-	}
+	handler := handlers.New(db, database.New(db))
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", app.healthHandler)
+	mux.HandleFunc("GET /health", handler.Health)
+	mux.HandleFunc("POST /shorten", handler.CreateShortURL)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -48,31 +41,5 @@ func main() {
 	log.Println("server listening on port", cfg.Port)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("server failed: ", err)
-	}
-}
-
-func (a *app) healthHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-
-	if err := a.db.Ping(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"status": "error",
-			"error":  "database unavailable",
-		})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
-	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Println("failed to write JSON response: ", err)
 	}
 }
